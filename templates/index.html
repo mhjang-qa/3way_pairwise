@@ -1,209 +1,215 @@
-<!-- ✅ Chart.js 그래프 정상 출력 및 Coverage 계산 오류 방어 로직 포함 버전 -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <title>페어와이즈 조합 Coverage 툴</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-light">
-<div class="container py-5">
-  <h2 class="mb-4">📊 페어와이즈 조합 Coverage 툴 <small class="text-muted">(2-way / 3-way)</small></h2>
+  <div class="container py-5">
+    <h2 class="mb-4">📊 페어와이즈 조합 Coverage 툴 <small class="text-muted">(2-way / 3-way)</small></h2>
 
-  <div class="card shadow-sm p-4 mb-4">
-    <div class="mb-3">
-      <label for="csvFile" class="form-label fw-bold">CSV 파일 업로드:</label>
-      <input type="file" class="form-control" id="csvFile" accept=".csv">
+    <div class="card shadow-sm p-4 mb-4">
+      <div class="mb-3">
+        <label for="csvFile" class="form-label fw-bold">CSV 파일 업로드:</label>
+        <input type="file" class="form-control" id="csvFile" accept=".csv">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Coverage 분석 방식:</label><br>
+        <input type="radio" name="level" value="2" checked> 2-way
+        <input type="radio" name="level" value="3"> 3-way
+      </div>
+
+      <div class="mb-3">
+        <label for="targetCoverage" class="form-label fw-bold">목표 Coverage %:</label>
+        <input type="number" class="form-control w-25" id="targetCoverage" value="90">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" onclick="runAnalysis()">분석 실행</button>
+        <button class="btn btn-success" onclick="saveResults()" id="saveBtn" disabled>결과 저장</button>
+        <button class="btn btn-outline-secondary" onclick="downloadChart()">그래프 저장</button>
+      </div>
+
+      <div class="mt-3">
+        <span id="status" class="fw-semibold text-danger"></span>
+      </div>
     </div>
 
-    <div class="mb-3">
-      <label class="form-label fw-bold">Coverage 분석 방식:</label><br>
-      <input class="form-check-input" type="radio" name="level" value="2" checked> 2-way
-      <input class="form-check-input ms-3" type="radio" name="level" value="3"> 3-way
+    <div class="card shadow-sm p-4">
+      <h5 class="mb-3">📈 Coverage 그래프</h5>
+      <canvas id="coverageChart" height="120"></canvas>
     </div>
-
-    <div class="mb-3">
-      <label for="targetCoverage" class="form-label fw-bold">목표 Coverage % (예: 90):</label>
-      <input type="number" class="form-control w-25" id="targetCoverage" value="90" min="1" max="100">
-    </div>
-
-    <div class="d-flex gap-2">
-      <button class="btn btn-primary" onclick="runAnalysis()">분석 실행</button>
-      <button class="btn btn-success" id="saveBtn" onclick="saveResults()" disabled>결과 저장</button>
-    </div>
-    <div class="mt-3 text-danger fw-bold" id="status"></div>
   </div>
 
-  <div class="card shadow-sm p-4">
-    <h5 class="mb-3">📈 Coverage 그래프</h5>
-    <canvas id="coverageChart" height="120"></canvas>
-  </div>
-</div>
+  <script>
+    let csvData = [], columns = [], allCombos = new Set(), coverageData = [], finalCombinations = [];
+    window.coverageChart = null;
 
-<script>
-let csvData = [], columns = [], allCombos = new Set(), coverageData = [], finalCombinations = [];
-window.coverageChart = null;
-
-document.getElementById('csvFile').addEventListener('change', function (e) {
-  const file = e.target.files[0];
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: function (results) {
-      csvData = results.data;
-      columns = results.meta.fields.filter(f => f && f.trim() !== "");
-      alert("CSV 파일이 로드되었습니다: " + columns.join(", "));
-    }
-  });
-});
-
-function combinations(arr, k) {
-  const result = [];
-  const combine = (start, combo) => {
-    if (combo.length === k) return result.push([...combo]);
-    for (let i = start; i < arr.length; i++) {
-      combo.push(arr[i]);
-      combine(i + 1, combo);
-      combo.pop();
-    }
-  };
-  combine(0, []);
-  return result;
-}
-
-function cartesian(...arrays) {
-  return arrays.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
-}
-
-function getUniqueValues(col) {
-  return [...new Set(csvData.map(row => row[col]).filter(x => x !== undefined && x !== null && x !== ""))];
-}
-
-function getAllPossibleCombos(level) {
-  const combos = new Set();
-  const columnCombos = combinations(columns, level);
-  for (const group of columnCombos) {
-    const values = cartesian(...group.map(getUniqueValues));
-    for (const val of values) {
-      const pair = group.map((c, i) => [c, val[i]]);
-      combos.add(JSON.stringify(pair));
-    }
-  }
-  return combos;
-}
-
-function runAnalysis() {
-  if (csvData.length === 0) return alert("CSV 파일을 먼저 업로드하세요.");
-  const level = parseInt(document.querySelector('input[name="level"]:checked').value);
-  const targetCov = parseFloat(document.getElementById("targetCoverage").value) / 100;
-
-  allCombos = getAllPossibleCombos(level);
-  if (allCombos.size === 0) return alert("⚠ 가능한 조합이 0개입니다. CSV 데이터를 확인하세요.");
-
-  const covered = new Set();
-  coverageData = [];
-  finalCombinations = [];
-  let reachedTargetIndex = -1;
-
-  for (let i = 0; i < csvData.length; i++) {
-    const row = csvData[i];
-    const pairs = combinations(columns.map(c => [c, row[c]]), level);
-    for (const p of pairs) covered.add(JSON.stringify(p));
-    const coverage = covered.size / allCombos.size;
-    coverageData.push({ count: i + 1, coverage });
-    if (reachedTargetIndex === -1 && coverage >= targetCov) {
-      reachedTargetIndex = i;
-      finalCombinations = csvData.slice(0, i + 1);
-      document.getElementById("status").innerText = `✅ 목표 Coverage 도달! 조합수: ${i + 1}`;
-    }
-  }
-
-  if (reachedTargetIndex === -1) {
-    reachedTargetIndex = csvData.length - 1;
-    finalCombinations = csvData;
-    const maxCov = (covered.size / allCombos.size * 100).toFixed(2);
-    document.getElementById("status").innerText = `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${maxCov}%`;
-  }
-
-  renderChart(reachedTargetIndex, targetCov * 100);
-  document.getElementById("saveBtn").disabled = false;
-}
-
-function renderChart(targetIndex, targetCoverage) {
-  const ctx = document.getElementById('coverageChart').getContext('2d');
-  if (window.coverageChart) window.coverageChart.destroy();
-
-  const totalCoverage = {
-    label: "전체 Coverage",
-    data: coverageData.map(d => typeof d.coverage === "number" ? d.coverage * 100 : null),
-    borderColor: "blue",
-    backgroundColor: "blue",
-    pointRadius: 2,
-    tension: 0,
-    fill: false
-  };
-
-  const selected = {
-    label: "선정된 조합",
-    data: coverageData.map((d, i) => i >= targetIndex ? d.coverage * 100 : null),
-    borderColor: "red",
-    backgroundColor: "red",
-    showLine: false,
-    pointRadius: 4
-  };
-
-  window.coverageChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: coverageData.map(d => d.count),
-      datasets: [totalCoverage, selected]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: "top" },
-        tooltip: {
-          callbacks: {
-            label: ctx => `Coverage: ${ctx.parsed.y.toFixed(2)}%`
-          }
+    document.getElementById('csvFile').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          csvData = results.data;
+          columns = results.meta.fields.filter(f => f && f.trim() !== "");
+          alert("CSV 로드 성공: " + columns.join(", "));
         }
-      },
-      scales: {
-        y: {
-          min: Math.max(targetCoverage - 5, 0),
-          max: 100,
-          title: { display: true, text: "Coverage (%)" },
-          ticks: {
-            callback: v => `${v}%`
-          }
-        },
-        x: {
-          title: { display: true, text: "조합 수" },
-          ticks: {
-            autoSkip: true,
-            maxTicksLimit: 20
-          }
+      });
+    });
+
+    function getUniqueValues(col) {
+      return [...new Set(csvData.map(row => row[col]).filter(v => v !== undefined && v !== null && v !== ""))];
+    }
+
+    function combinations(arr, k) {
+      const result = [];
+      const combine = (start, combo) => {
+        if (combo.length === k) result.push([...combo]);
+        for (let i = start; i < arr.length; i++) {
+          combo.push(arr[i]);
+          combine(i + 1, combo);
+          combo.pop();
+        }
+      };
+      combine(0, []);
+      return result;
+    }
+
+    function cartesian(...arrays) {
+      return arrays.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
+    }
+
+    function getAllPossibleCombos(level) {
+      const combos = new Set();
+      for (const cols of combinations(columns, level)) {
+        const valueCombos = cartesian(...cols.map(c => getUniqueValues(c)));
+        for (const vals of valueCombos) {
+          combos.add(JSON.stringify(cols.map((c, i) => [c, vals[i]])));
         }
       }
+      return combos;
     }
-  });
-}
 
-function saveResults() {
-  if (!finalCombinations.length) return;
-  const csv = Papa.unparse(finalCombinations);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "coverage_result.csv";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  alert("CSV 저장 완료!");
-}
-</script>
+    function runAnalysis() {
+      if (csvData.length === 0) return alert("CSV 파일을 먼저 업로드하세요.");
+
+      const level = parseInt(document.querySelector('input[name="level"]:checked').value);
+      const target = parseFloat(document.getElementById("targetCoverage").value) / 100;
+
+      allCombos = getAllPossibleCombos(level);
+      const covered = new Set();
+      coverageData = [];
+      finalCombinations = [];
+
+      let reachedIdx = -1;
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i];
+        const pairs = combinations(columns.map(c => [c, row[c]]), level);
+        for (const p of pairs) covered.add(JSON.stringify(p));
+        const cov = covered.size / allCombos.size;
+        coverageData.push({ count: i + 1, coverage: cov });
+        if (reachedIdx === -1 && cov >= target) {
+          reachedIdx = i;
+          finalCombinations = csvData.slice(0, i + 1);
+          document.getElementById("status").textContent = `✅ 목표 Coverage 도달 (조합수: ${i + 1})`;
+        }
+      }
+
+      if (reachedIdx === -1) {
+        document.getElementById("status").textContent = `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${(coverageData.at(-1).coverage * 100).toFixed(2)}%`;
+        finalCombinations = csvData;
+        reachedIdx = coverageData.length - 1;
+      }
+
+      renderChart(reachedIdx, target * 100);
+      document.getElementById("saveBtn").disabled = false;
+    }
+
+    function renderChart(targetIdx, targetPercent) {
+      const ctx = document.getElementById('coverageChart').getContext('2d');
+      if (window.coverageChart) window.coverageChart.destroy();
+
+      const totalData = coverageData.map(d => d.coverage * 100);
+      const selected = coverageData.map((d, i) => i >= targetIdx ? d.coverage * 100 : null);
+      const labels = coverageData.map(d => d.count);
+
+      window.coverageChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "전체 Coverage",
+              data: totalData,
+              borderColor: "blue",
+              backgroundColor: "blue",
+              tension: 0.1,
+              pointRadius: 2
+            },
+            {
+              label: "선정된 조합",
+              data: selected,
+              borderColor: "red",
+              backgroundColor: "red",
+              type: 'line',
+              showLine: false,
+              pointRadius: 4
+            }
+          ]
+        },
+        options: {
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              callbacks: {
+                label: ctx => `Coverage: ${ctx.parsed.y.toFixed(2)}%`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: '조합 수' },
+              ticks: {
+                autoSkip: false,
+                stepSize: 1,
+                callback: v => v >= 1000 ? (v / 1000) + 'k' : v
+              }
+            },
+            y: {
+              title: { display: true, text: 'Coverage (%)' },
+              min: Math.max(targetPercent - 5, 0),
+              max: 100,
+              ticks: {
+                callback: v => v + '%'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function downloadChart() {
+      if (!window.coverageChart) return;
+      const a = document.createElement('a');
+      a.href = window.coverageChart.toBase64Image();
+      a.download = 'coverage_chart.png';
+      a.click();
+    }
+
+    function saveResults() {
+      if (!finalCombinations.length) return;
+      const csv = Papa.unparse(finalCombinations);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "coverage_result.csv";
+      link.click();
+    }
+  </script>
 </body>
 </html>
