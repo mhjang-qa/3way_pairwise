@@ -70,14 +70,16 @@
         skipEmptyLines: true,
         complete: function (results) {
           csvData = results.data;
-          columns = results.meta.fields;
+          columns = results.meta.fields.filter(f => f && f.trim() !== "");
           alert("CSV 파일이 로드되었습니다: " + columns.join(", "));
         }
       });
     });
 
     function getUniqueValues(col) {
-      return [...new Set(csvData.map(row => row[col]).filter(x => x !== undefined && x !== ""))];
+      return [...new Set(csvData.map(row => row[col]).filter(x =>
+        x !== undefined && x !== null && x !== "" && !Number.isNaN(x)
+      ))];
     }
 
     function combinations(arr, k) {
@@ -99,15 +101,18 @@
     }
 
     function getAllPossibleCombos(level) {
-      const combos = new Set();
-      const colComb = combinations(columns, level);
-      for (const cols of colComb) {
-        const valueComb = cartesian(...cols.map(c => getUniqueValues(c)));
-        for (const row of valueComb) {
-          combos.add(JSON.stringify(cols.map((c, i) => [c, row[i]])));
+      const allCombos = new Set();
+      const columnCombos = combinations(columns, level);
+
+      for (const colGroup of columnCombos) {
+        const valueCombos = cartesian(...colGroup.map(c => getUniqueValues(c)));
+        for (const vals of valueCombos) {
+          const pair = colGroup.map((c, idx) => [c, vals[idx]]);
+          allCombos.add(JSON.stringify(pair));
         }
       }
-      return combos;
+
+      return allCombos;
     }
 
 
