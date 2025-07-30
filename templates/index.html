@@ -124,6 +124,8 @@
       coverageData = [];
       finalCombinations = [];
 
+      let reachedTargetIndex = -1;
+
       for (let i = 0; i < csvData.length; i++) {
         const row = csvData[i];
         const pairs = combinations(columns.map(c => [c, row[c]]), level);
@@ -133,53 +135,43 @@
         const coverage = covered.size / allCombos.size;
         coverageData.push({ count: i + 1, coverage });
 
-        if (coverage >= targetCov) {
+        if (reachedTargetIndex === -1 && coverage >= targetCov) {
+          reachedTargetIndex = i;
           finalCombinations = csvData.slice(0, i + 1);
-          document.getElementById("status").innerText = `✅ 목표 Coverage 도달! 조합수: ${i + 1}`;
-          break;
+          document.getElementById("status").innerText =
+            `✅ 목표 Coverage 도달! 조합수: ${i + 1}`;
+          // break 없이 계속 coverageData 누적
         }
       }
 
-      if (finalCombinations.length === 0) {
-        document.getElementById("status").innerText = `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${(covered.size / allCombos.size * 100).toFixed(2)}%`;
+      // 목표 Coverage 미달 시
+      if (reachedTargetIndex === -1) {
+        document.getElementById("status").innerText =
+          `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${(covered.size / allCombos.size * 100).toFixed(2)}%`;
         finalCombinations = csvData;
+        reachedTargetIndex = coverageData.length - 1;
       }
 
-      renderChart();
+      // renderChart에 target index 넘김
+      renderChart(reachedTargetIndex);
       document.getElementById("saveBtn").disabled = false;
     }
 
-    function renderChart() {
+    function renderChart(targetIndex) {
       const ctx = document.getElementById('coverageChart').getContext('2d');
 
-      // ✅ 기존 차트 제거
       if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
         window.coverageChart.destroy();
       }
 
-      // ✅ 전체 Coverage (파란선)
-      const totalCoverage = {
-        label: "전체 Coverage",
-        data: coverageData.map(d => d.coverage * 100),
-        borderColor: "blue",
-        backgroundColor: "blue",
-        borderWidth: 2,
-        tension: 0,               // 곡선 없이 직선
-        pointRadius: 2,
-        pointHoverRadius: 4,
-        fill: false
-      };
+      // ✅ 확대 범위 계산
+      const targetCoverage = coverageData[targetIndex].coverage * 100;
+      const minY = Math.max(targetCoverage - 5, 0);  // 5% 아래부터
+      const maxY = 100;
 
-      // ✅ 목표 Coverage 도달까지의 조합 (빨간점)
-    function renderChart() {
-      const ctx = document.getElementById('coverageChart').getContext('2d');
+      const minX = Math.max(coverageData[targetIndex].count - 500, 0);  // 조합 수 여유
+      const maxX = coverageData[coverageData.length - 1].count;
 
-      // 기존 차트 제거
-      if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
-        window.coverageChart.destroy();
-      }
-
-      // 전체 Coverage: 파란선
       const totalCoverage = {
         label: "전체 Coverage",
         data: coverageData.map(d => d.coverage * 100),
@@ -192,7 +184,6 @@
         fill: false
       };
 
-      // 선정된 조합: 빨간점
       const selectedCoverage = {
         label: "선정된 조합",
         data: coverageData.map((d, i) => i < finalCombinations.length ? d.coverage * 100 : null),
@@ -207,7 +198,7 @@
       window.coverageChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: coverageData.map(d => d.count), // x축: 조합 수
+          labels: coverageData.map(d => d.count),
           datasets: [totalCoverage, selectedCoverage]
         },
         options: {
@@ -227,8 +218,8 @@
           },
           scales: {
             y: {
-              beginAtZero: true,
-              max: 100,
+              min: minY,
+              max: maxY,
               title: {
                 display: true,
                 text: "Coverage (%)"
@@ -238,6 +229,8 @@
               }
             },
             x: {
+              min: minX,
+              max: maxX,
               title: {
                 display: true,
                 text: "조합 수"
