@@ -1,11 +1,30 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, abort, send_from_directory
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'  # 실제 운영 시 강력한 난수로 설정
+app.secret_key = 'QA-team-is-best-team'
 
-# 하드코딩된 관리자 계정 
+# ✅ 허용된 IP 목록
+ALLOWED_IPS = {
+    "219.240.45.245",
+    "175.120.219.199",
+    "218.237.59.80",
+    "121.141.180.210"
+}
+
+# ✅ 요청 전에 IP 검사
+@app.before_request
+def limit_remote_addr():
+    client_ip = request.remote_addr
+    if client_ip not in ALLOWED_IPS:
+        return "접근이 허용되지 않은 IP입니다.", 403
+
+# ✅ 관리자 계정
 VALID_USERS = {
-    'mino': 'mino'
+    'mino': 'mino',
+    'khs06': 'plateerkhs06',
+    'jekim': 'admin0218?',
+    'sen9088': 'xptmxm123!'
+    
 }
 
 @app.route('/')
@@ -14,14 +33,12 @@ def home():
         return render_template('index.html', username=session['user'])
     return redirect(url_for('login'))
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
         if VALID_USERS.get(username) == password:
             session['user'] = username
             return redirect(url_for('home'))
@@ -33,8 +50,6 @@ def login():
 def logout():
     session.pop('user', None)
     return redirect(url_for('login'))
-
-from flask import send_from_directory
 
 @app.route('/favicon.ico')
 def favicon():

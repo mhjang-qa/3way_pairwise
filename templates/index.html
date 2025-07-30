@@ -60,6 +60,7 @@
   </div>
 
   <script>
+    window.coverageChart = null;
     let csvData = [], columns = [], allCombos = new Set(), coverageData = [], finalCombinations = [];
 
     document.getElementById('csvFile').addEventListener('change', function (e) {
@@ -163,7 +164,12 @@
         }]
       };
 
-      if (window.coverageChart) window.coverageChart.destroy();
+      // ✅ 안전하게 destroy
+      if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
+        window.coverageChart.destroy();
+      }
+
+      // ✅ 새로 차트 그리기
       window.coverageChart = new Chart(ctx, {
         type: 'line',
         data: data,
