@@ -151,41 +151,77 @@
 
     function renderChart() {
       const ctx = document.getElementById('coverageChart').getContext('2d');
-      const data = {
-        labels: coverageData.map(d => d.count),
-        datasets: [{
-          label: "Coverage",
-          data: coverageData.map(d => d.coverage * 100),
-          borderColor: "rgba(13,110,253,1)",
-          backgroundColor: "rgba(13,110,253,0.2)",
-          borderWidth: 2,
-          tension: 0.1,
-          fill: true
-        }]
-      };
 
-      // ✅ 안전하게 destroy
+      // ✅ 기존 차트 제거
       if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
         window.coverageChart.destroy();
       }
 
-      // ✅ 새로 차트 그리기
+      // ✅ 전체 Coverage (파란선)
+      const totalCoverage = {
+        label: "전체 Coverage",
+        data: coverageData.map(d => d.coverage * 100),
+        borderColor: "blue",
+        backgroundColor: "blue",
+        borderWidth: 2,
+        tension: 0,               // 곡선 없이 직선
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        fill: false
+      };
+
+      // ✅ 목표 Coverage 도달까지의 조합 (빨간점)
+      const selectedCoverage = {
+        label: "선정된 조합",
+        data: coverageData.map((d, i) => {
+          return i < finalCombinations.length ? d.coverage * 100 : null;
+        }),
+        borderColor: "red",
+        backgroundColor: "red",
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        showLine: false,         // 선 없이 점만
+        type: "line"
+      };
+
+      // ✅ 차트 생성
       window.coverageChart = new Chart(ctx, {
         type: 'line',
-        data: data,
+        data: {
+          labels: coverageData.map(d => d.count),  // x축: 조합 수
+          datasets: [totalCoverage, selectedCoverage]
+        },
         options: {
+          responsive: true,
           plugins: {
-            legend: { position: "top" }
+            legend: {
+              position: "top"
+            },
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  return `Coverage: ${context.parsed.y.toFixed(2)}%`;
+                }
+              }
+            }
           },
           scales: {
             y: {
               beginAtZero: true,
               max: 100,
-              title: { display: true, text: "Coverage (%)" },
-              ticks: { callback: value => value + "%" }
+              title: {
+                display: true,
+                text: "Coverage (%)"
+              },
+              ticks: {
+                callback: value => value + "%"
+              }
             },
             x: {
-              title: { display: true, text: "조합 수" }
+              title: {
+                display: true,
+                text: "조합 수"
+              }
             }
           }
         }
