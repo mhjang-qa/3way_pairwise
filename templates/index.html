@@ -171,24 +171,43 @@
       };
 
       // ✅ 목표 Coverage 도달까지의 조합 (빨간점)
+    function renderChart() {
+      const ctx = document.getElementById('coverageChart').getContext('2d');
+
+      // 기존 차트 제거
+      if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
+        window.coverageChart.destroy();
+      }
+
+      // 전체 Coverage: 파란선
+      const totalCoverage = {
+        label: "전체 Coverage",
+        data: coverageData.map(d => d.coverage * 100),
+        borderColor: "blue",
+        backgroundColor: "blue",
+        borderWidth: 2,
+        tension: 0,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        fill: false
+      };
+
+      // 선정된 조합: 빨간점
       const selectedCoverage = {
         label: "선정된 조합",
-        data: coverageData.map((d, i) => {
-          return i < finalCombinations.length ? d.coverage * 100 : null;
-        }),
+        data: coverageData.map((d, i) => i < finalCombinations.length ? d.coverage * 100 : null),
         borderColor: "red",
         backgroundColor: "red",
         pointRadius: 4,
         pointHoverRadius: 6,
-        showLine: false,         // 선 없이 점만
+        showLine: false,
         type: "line"
       };
 
-      // ✅ 차트 생성
       window.coverageChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: coverageData.map(d => d.count),  // x축: 조합 수
+          labels: coverageData.map(d => d.count), // x축: 조합 수
           datasets: [totalCoverage, selectedCoverage]
         },
         options: {
@@ -199,8 +218,9 @@
             },
             tooltip: {
               callbacks: {
-                label: (context) => {
-                  return `Coverage: ${context.parsed.y.toFixed(2)}%`;
+                label: context => {
+                  const val = context.parsed.y;
+                  return `Coverage: ${val.toFixed(2)}%`;
                 }
               }
             }
@@ -221,6 +241,14 @@
               title: {
                 display: true,
                 text: "조합 수"
+              },
+              ticks: {
+                autoSkip: true,
+                maxTicksLimit: 20,
+                callback: function (value, index, ticks) {
+                  if (value >= 1000) return (value / 1000).toFixed(1) + "k";
+                  return value;
+                }
               }
             }
           }
