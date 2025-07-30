@@ -11,10 +11,13 @@ ALLOWED_IPS = {
     "121.141.180.210"
 }
 
-# ✅ 요청 전에 IP 검사
+def get_client_ip():
+    forwarded_for = request.headers.get('X-Forwarded-For', request.remote_addr)
+    return forwarded_for.split(',')[0].strip()
+
 @app.before_request
 def limit_remote_addr():
-    client_ip = request.remote_addr
+    client_ip = get_client_ip()
     if client_ip not in ALLOWED_IPS:
         return "접근이 허용되지 않은 IP입니다.", 403
 
