@@ -159,7 +159,7 @@
     }
 
 
-    function renderChart(targetIndex) {
+    function renderChart(targetIndex, targetCoveragePercent) {
       const ctx = document.getElementById('coverageChart').getContext('2d');
 
       if (window.coverageChart && typeof window.coverageChart.destroy === 'function') {
@@ -168,7 +168,7 @@
 
       // ✅ 확대 범위 계산
       const targetCoverage = coverageData[targetIndex].coverage * 100;
-      const minY = Math.max(targetCoverage - 5, 0);  // 5% 아래부터
+      const minY = Math.max(targetCoveragePercent - 5, 0);  // 5% 아래부터
       const maxY = 100;
 
       const minX = 0;  // 조합 수 여유
