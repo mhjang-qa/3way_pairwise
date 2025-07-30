@@ -110,6 +110,7 @@
       return combos;
     }
 
+
     function runAnalysis() {
       if (csvData.length === 0) {
         alert("CSV 파일을 먼저 업로드하세요.");
@@ -140,7 +141,7 @@
           finalCombinations = csvData.slice(0, i + 1);
           document.getElementById("status").innerText =
             `✅ 목표 Coverage 도달! 조합수: ${i + 1}`;
-          // break 없이 계속 coverageData 누적
+          // break 없이 끝까지 coverageData 누적
         }
       }
 
@@ -152,10 +153,11 @@
         reachedTargetIndex = coverageData.length - 1;
       }
 
-      // renderChart에 target index 넘김
-      renderChart(reachedTargetIndex);
+      // ✅ Chart 렌더링에 필요한 index, coverage % 전달
+      renderChart(reachedTargetIndex, targetCov * 100);
       document.getElementById("saveBtn").disabled = false;
     }
+
 
     function renderChart(targetIndex) {
       const ctx = document.getElementById('coverageChart').getContext('2d');
@@ -169,7 +171,7 @@
       const minY = Math.max(targetCoverage - 5, 0);  // 5% 아래부터
       const maxY = 100;
 
-      const minX = Math.max(coverageData[targetIndex].count - 500, 0);  // 조합 수 여유
+      const minX = 0;  // 조합 수 여유
       const maxX = coverageData[coverageData.length - 1].count;
 
       const totalCoverage = {
@@ -186,7 +188,7 @@
 
       const selectedCoverage = {
         label: "선정된 조합",
-        data: coverageData.map((d, i) => i < finalCombinations.length ? d.coverage * 100 : null),
+        data: coverageData.map((d, i) => i >= targetIndex ? d.coverage * 100 : null),
         borderColor: "red",
         backgroundColor: "red",
         pointRadius: 4,
