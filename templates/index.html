@@ -134,35 +134,36 @@
       const ctx = document.getElementById('coverageChart').getContext('2d');
       if (window.coverageChart) window.coverageChart.destroy();
 
-      const totalData = coverageData.map(d => d.coverage * 100);
-      const selected = coverageData.map((d, i) => i >= targetIdx ? d.coverage * 100 : null);
-      const labels = coverageData.map(d => d.count);
+      const allPoints = coverageData.map((d, i) => ({ x: d.count, y: d.coverage * 100 }));
+      const selectedPoints = coverageData
+        .map((d, i) => i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null)
+        .filter(d => d);
 
       window.coverageChart = new Chart(ctx, {
-        type: 'line',
+        type: 'scatter',
         data: {
-          labels,
           datasets: [
             {
-              label: "전체 Coverage",
-              data: totalData,
-              borderColor: "blue",
-              backgroundColor: "blue",
-              tension: 0.1,
-              pointRadius: 2
+              label: '전체 Coverage',
+              data: allPoints,
+              showLine: true,
+              borderColor: 'blue',
+              backgroundColor: 'blue',
+              pointRadius: 2,
+              tension: 0
             },
             {
-              label: "선정된 조합",
-              data: selected,
-              borderColor: "red",
-              backgroundColor: "red",
-              type: 'line',
+              label: '선정된 조합',
+              data: selectedPoints,
               showLine: false,
+              borderColor: 'red',
+              backgroundColor: 'red',
               pointRadius: 4
             }
           ]
         },
         options: {
+          responsive: true,
           plugins: {
             legend: { position: 'top' },
             tooltip: {
@@ -173,16 +174,16 @@
           },
           scales: {
             x: {
+              type: 'linear',
               title: { display: true, text: '조합 수' },
               ticks: {
-                autoSkip: false,
-                stepSize: 1,
-                callback: v => v >= 1000 ? (v / 1000) + 'k' : v
+                autoSkip: true,
+                maxTicksLimit: 20
               }
             },
             y: {
               title: { display: true, text: 'Coverage (%)' },
-              min: Math.max(targetPercent - 5, 0),
+              min: 0,
               max: 100,
               ticks: {
                 callback: v => v + '%'
