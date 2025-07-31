@@ -45,188 +45,189 @@
     </div>
   </div>
 
-  <script>
-    let csvData = [], columns = [], allCombos = new Set(), coverageData = [], finalCombinations = [];
-    window.coverageChart = null;
 
-    document.getElementById('csvFile').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: function (results) {
-          csvData = results.data;
-          columns = results.meta.fields.filter(f => f && f.trim() !== "");
-          alert("CSV 로드 성공: " + columns.join(", "));
-        }
-      });
-    });
+  <!-- [기존 <head>와 <body> 윗부분 동일 — 생략] -->
+<script>
+let csvData = [], columns = [], allCombos = new Set(), coverageData = [], finalCombinations = [];
+window.coverageChart = null;
 
-    function getUniqueValues(col) {
-      return [...new Set(csvData.map(row => row[col]).filter(v => v !== undefined && v !== null && v !== ""))];
+document.getElementById('csvFile').addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function (results) {
+      csvData = results.data;
+      columns = results.meta.fields.filter(f => f && f.trim() !== "");
+      alert("CSV 로드 성공: " + columns.join(", "));
+    }
+  });
+});
+
+function getUniqueValues(col) {
+  return [...new Set(csvData.map(row => row[col]).filter(v => v !== undefined && v !== null && v !== ""))];
+}
+
+function combinations(arr, k) {
+  const result = [];
+  const combine = (start, combo) => {
+    if (combo.length === k) result.push([...combo]);
+    for (let i = start; i < arr.length; i++) {
+      combo.push(arr[i]);
+      combine(i + 1, combo);
+      combo.pop();
+    }
+  };
+  combine(0, []);
+  return result;
+}
+
+function cartesian(...arrays) {
+  return arrays.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
+}
+
+function getAllPossibleCombos(level) {
+  const combos = new Set();
+  const colCombos = combinations(columns, level);
+
+  for (const colSet of colCombos) {
+    const valCombos = cartesian(...colSet.map(col => getUniqueValues(col)));
+    for (const vals of valCombos) {
+      const pair = colSet.map((col, idx) => [col, vals[idx]]);
+      combos.add(JSON.stringify(pair));
+    }
+  }
+  return combos;
+}
+
+function runAnalysis() {
+  if (csvData.length === 0) return alert("CSV 파일을 먼저 업로드하세요.");
+  const level = parseInt(document.querySelector('input[name="level"]:checked').value);
+  const target = parseFloat(document.getElementById("targetCoverage").value) / 100;
+
+  allCombos = getAllPossibleCombos(level);
+  const covered = new Set();
+  coverageData = [];
+  finalCombinations = [];
+
+  let reachedIdx = -1;
+
+  for (let i = 0; i < csvData.length; i++) {
+    const row = csvData[i];
+    const colCombos = combinations(columns, level);
+    for (const colSet of colCombos) {
+      const pair = colSet.map(col => [col, row[col]]);
+      covered.add(JSON.stringify(pair));
     }
 
-    function combinations(arr, k) {
-      const result = [];
-      const combine = (start, combo) => {
-        if (combo.length === k) result.push([...combo]);
-        for (let i = start; i < arr.length; i++) {
-          combo.push(arr[i]);
-          combine(i + 1, combo);
-          combo.pop();
-        }
-      };
-      combine(0, []);
-      return result;
+    const cov = covered.size / allCombos.size;
+    coverageData.push({ count: i + 1, coverage: cov });
+
+    if (reachedIdx === -1 && cov >= target) {
+      reachedIdx = i;
+      document.getElementById("status").textContent = `✅ 목표 Coverage 도달 (조합수: ${i + 1})`;
     }
+  }
 
-    function cartesian(...arrays) {
-      return arrays.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
-    }
+  finalCombinations = csvData;
 
-    function getAllPossibleCombos(level) {
-      const combos = new Set();
-      for (const cols of combinations(columns, level)) {
-        const valueCombos = cartesian(...cols.map(c => getUniqueValues(c)));
-        for (const vals of valueCombos) {
-          combos.add(JSON.stringify(cols.map((c, i) => [c, vals[i]])));
-        }
-      }
-      return combos;
-    }
+  if (reachedIdx === -1) {
+    document.getElementById("status").textContent =
+      `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${(coverageData.at(-1).coverage * 100).toFixed(2)}%`;
+  }
 
-    function runAnalysis() {
-      if (csvData.length === 0) return alert("CSV 파일을 먼저 업로드하세요.");
+  for (let i = coverageData.length + 1; i <= allCombos.size; i++) {
+    coverageData.push({ count: i, coverage: covered.size / allCombos.size });
+  }
 
-      const level = parseInt(document.querySelector('input[name="level"]:checked').value);
-      const target = parseFloat(document.getElementById("targetCoverage").value) / 100;
+  renderChart(reachedIdx, target * 100);
+  document.getElementById("saveBtn").disabled = false;
 
-      allCombos = getAllPossibleCombos(level);
-      const covered = new Set();
-      coverageData = [];
-      finalCombinations = [];
+  console.log("✅ 총 조합 수:", allCombos.size);
+  console.log("✅ coverageData.length:", coverageData.length);
+  console.log("✅ finalCombinations.length:", finalCombinations.length);
+}
 
-      let reachedIdx = -1;
-      for (let i = 0; i < csvData.length; i++) {
-        const row = csvData[i];
-        const pairs = combinations(columns.map(c => [c, row[c]]), level);
-        for (const p of pairs) covered.add(JSON.stringify(p));
-        const cov = covered.size / allCombos.size;
-        coverageData.push({ count: i + 1, coverage: cov });
+function renderChart(targetIdx, targetPercent) {
+  const ctx = document.getElementById('coverageChart').getContext('2d');
+  if (window.coverageChart) window.coverageChart.destroy();
 
-        // 최초로 목표 도달한 인덱스만 체크
-        if (reachedIdx === -1 && cov >= target) {
-          reachedIdx = i;
-          document.getElementById("status").textContent = `✅ 목표 Coverage 도달 (조합수: ${i + 1})`;
-        }
-      }
+  const allPoints = coverageData.map((d) => ({ x: d.count, y: d.coverage * 100 }));
+  const selectedPoints = coverageData.map((d, i) =>
+    i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null
+  ).filter(Boolean);
 
-      // ✅ 항상 전체 결과 저장 (GUI처럼)
-      finalCombinations = csvData; // 현재 데이터가 coverage만 늘어날 뿐 줄지 않음
-      // 목표 도달 못한 경우 메시지 보정
-      if (reachedIdx === -1) {
-        document.getElementById("status").textContent =
-          `⚠️ 목표 Coverage 미달성. 최대 Coverage: ${(coverageData.at(-1).coverage * 100).toFixed(2)}%`;
-      }
-
-            // 누락된 조합 수까지 0% 또는 마지막 coverage로 채움 (GUI처럼 X축을 늘리기 위함)
-      for (let i = coverageData.length + 1; i <= allCombos.size; i++) {
-        coverageData.push({ count: i, coverage: covered.size / allCombos.size });
-      }
-
-      renderChart(reachedIdx, target * 100);
-      document.getElementById("saveBtn").disabled = false;
-
-      console.log("✅ 총 조합 수:", allCombos.size);
-      console.log("✅ coverageData.length:", coverageData.length);
-      console.log("✅ finalCombinations.length:", finalCombinations.length);
-
-
-    }
-
-    function renderChart(targetIdx, targetPercent) {
-      const ctx = document.getElementById('coverageChart').getContext('2d');
-      if (window.coverageChart) window.coverageChart.destroy();
-
-      const allPoints = coverageData.map((d) => ({ x: d.count, y: d.coverage * 100 }));
-      const selectedPoints = coverageData.map((d, i) =>
-        i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null
-      ).filter(Boolean);
-
-      window.coverageChart = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-          datasets: [
-            {
-              label: '전체 Coverage',
-              data: allPoints,
-              showLine: true,
-              borderColor: 'blue',
-              backgroundColor: 'blue',
-              pointRadius: 2,
-              tension: 0
-            },
-            {
-              label: '선정된 조합',
-              data: selectedPoints,
-              showLine: false,
-              borderColor: 'red',
-              backgroundColor: 'red',
-              pointRadius: 4
-            }
-          ]
+  window.coverageChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: '전체 Coverage',
+          data: allPoints,
+          showLine: true,
+          borderColor: 'blue',
+          backgroundColor: 'blue',
+          pointRadius: 2,
+          tension: 0
         },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' },
-            tooltip: {
-              callbacks: {
-                label: ctx => `Coverage: ${ctx.parsed.y.toFixed(2)}%`
-              }
-            }
-          },
-          scales: {
-            x: {
-              type: 'linear',
-              title: { display: true, text: '조합 수' },
-              min: 0,
-              max: allCombos.size, // 이 부분이 핵심입니다
-              ticks: {
-                autoSkip: false,
-                stepSize: Math.ceil(allCombos.size / 20), // X축 너무 길어지지 않게 간격 설정
-                callback: v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v
-              }
-            },
-            y: {
-              title: { display: true, text: 'Coverage (%)' },
-              min: 0,
-              max: 100,
-              ticks: {
-                callback: v => `${v}%`
-              }
-            }
+        {
+          label: '선정된 조합',
+          data: selectedPoints,
+          showLine: false,
+          borderColor: 'red',
+          backgroundColor: 'red',
+          pointRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `Coverage: ${ctx.parsed.y.toFixed(2)}%`
           }
         }
-      });
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: '조합 수' },
+          min: 0,
+          max: allCombos.size,
+          ticks: {
+            autoSkip: false,
+            stepSize: Math.ceil(allCombos.size / 20),
+            callback: v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v
+          }
+        },
+        y: {
+          title: { display: true, text: 'Coverage (%)' },
+          min: 0,
+          max: 100,
+          ticks: { callback: v => `${v}%` }
+        }
+      }
     }
-    function downloadChart() {
-      if (!window.coverageChart) return;
-      const a = document.createElement('a');
-      a.href = window.coverageChart.toBase64Image();
-      a.download = 'coverage_chart.png';
-      a.click();
-    }
+  });
+}
 
-    function saveResults() {
-      if (!finalCombinations.length) return;
-      const csv = Papa.unparse(finalCombinations);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "coverage_result.csv";
-      link.click();
-    }
-  </script>
-</body>
-</html>
+function downloadChart() {
+  if (!window.coverageChart) return;
+  const a = document.createElement('a');
+  a.href = window.coverageChart.toBase64Image();
+  a.download = 'coverage_chart.png';
+  a.click();
+}
+
+function saveResults() {
+  if (!finalCombinations.length) return;
+  const csv = Papa.unparse(finalCombinations);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "coverage_result.csv";
+  link.click();
+}
+</script>
