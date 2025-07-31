@@ -134,10 +134,10 @@
       const ctx = document.getElementById('coverageChart').getContext('2d');
       if (window.coverageChart) window.coverageChart.destroy();
 
-      const allPoints = coverageData.map((d, i) => ({ x: d.count, y: d.coverage * 100 }));
-      const selectedPoints = coverageData
-        .map((d, i) => i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null)
-        .filter(d => d);
+      const allPoints = coverageData.map((d) => ({ x: d.count, y: d.coverage * 100 }));
+      const selectedPoints = coverageData.map((d, i) =>
+        i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null
+      ).filter(d => d);
 
       window.coverageChart = new Chart(ctx, {
         type: 'scatter',
@@ -149,7 +149,8 @@
               showLine: true,
               borderColor: 'blue',
               backgroundColor: 'blue',
-              pointRadius: 2,
+              pointRadius: 1,
+              borderWidth: 1,
               tension: 0
             },
             {
@@ -176,6 +177,8 @@
             x: {
               type: 'linear',
               title: { display: true, text: '조합 수' },
+              min: 0,
+              max: coverageData.length,
               ticks: {
                 autoSkip: true,
                 maxTicksLimit: 20
@@ -193,7 +196,6 @@
         }
       });
     }
-
     function downloadChart() {
       if (!window.coverageChart) return;
       const a = document.createElement('a');
