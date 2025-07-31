@@ -126,8 +126,15 @@
         reachedIdx = coverageData.length - 1;
       }
 
+            // 누락된 조합 수까지 0% 또는 마지막 coverage로 채움 (GUI처럼 X축을 늘리기 위함)
+      for (let i = coverageData.length + 1; i <= allCombos.size; i++) {
+        coverageData.push({ count: i, coverage: covered.size / allCombos.size });
+      }
+
       renderChart(reachedIdx, target * 100);
       document.getElementById("saveBtn").disabled = false;
+
+
     }
 
     function renderChart(targetIdx, targetPercent) {
@@ -137,7 +144,7 @@
       const allPoints = coverageData.map((d) => ({ x: d.count, y: d.coverage * 100 }));
       const selectedPoints = coverageData.map((d, i) =>
         i >= targetIdx ? { x: d.count, y: d.coverage * 100 } : null
-      ).filter(d => d);
+      ).filter(Boolean);
 
       window.coverageChart = new Chart(ctx, {
         type: 'scatter',
@@ -149,8 +156,7 @@
               showLine: true,
               borderColor: 'blue',
               backgroundColor: 'blue',
-              pointRadius: 1,
-              borderWidth: 1,
+              pointRadius: 2,
               tension: 0
             },
             {
@@ -178,10 +184,11 @@
               type: 'linear',
               title: { display: true, text: '조합 수' },
               min: 0,
-              max: coverageData.length,
+              max: allCombos.size, // 이 부분이 핵심입니다
               ticks: {
-                autoSkip: true,
-                maxTicksLimit: 20
+                autoSkip: false,
+                stepSize: Math.ceil(allCombos.size / 20), // X축 너무 길어지지 않게 간격 설정
+                callback: v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v
               }
             },
             y: {
@@ -189,7 +196,7 @@
               min: 0,
               max: 100,
               ticks: {
-                callback: v => v + '%'
+                callback: v => `${v}%`
               }
             }
           }
